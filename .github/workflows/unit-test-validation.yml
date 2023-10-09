@@ -59,7 +59,7 @@ jobs:
 
       - name: Run unit tests without changes
         run: |
-          if [ ${{ env.TESTS_CHANGED }} -eq 0 ]; then
+          if [[ ${{ env.TESTS_CHANGED }} -eq 0 ]]; then
             echo "No unit test changes detected, skipping"
             exit 0
           fi
