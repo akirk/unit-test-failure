@@ -42,6 +42,9 @@ jobs:
         with:
           python-version: 3.9
 
+      - name: 'Fetch the other branch with enough history for a common merge-base commit'
+        run: git fetch origin ${{ github.event.pull_request.base.ref }}
+
       - name: Revert code changes (excluding tests)
         run: git restore --source=$(git merge-base ${{ github.event.pull_request.base.ref }} ${{ github.head_ref }}) --worktree :^tests/
 
