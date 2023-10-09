@@ -37,7 +37,7 @@ jobs:
           python-version: 3.9
 
       - name: Revert code changes (excluding tests)
-        run: git restore --source=${{ github.base_ref }} --staged --worktree :^tests/
+        run: git restore --source=$(git log --pretty=format:"%H" --reverse | head -n 1) --staged --worktree :^tests/
 
       - name: Run unit tests without changes
         run: |
