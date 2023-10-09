@@ -1,0 +1,21 @@
+# Python-specific
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyz
+env/
+
+# Testing-specific
+.coverage
+htmlcov/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Miscellaneous
+.DS_Store
+*.swp
+
