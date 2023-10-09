@@ -40,53 +40,11 @@ jobs:
         run: git restore --source=${{ github.base_ref }} --staged --worktree :^tests/
 
       - name: Run unit tests without changes
-        run: python -m unittest discover -s tests
-
-  validate-test-failure:
-    needs: test-without-changes
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' }}
-
-    steps:
-      - name: Set a variable indicating failure
-        id: fail-marker
-        run: echo "::set-output name=fail::false"
-
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
-
-      - name: Run unit tests without changes
-        run: python -m unittest discover -s tests
-
-      - name: Check if tests failed
-        id: test-results
         run: |
-          if [[ $? -eq 0 ]]; then
-            echo "::set-output name=fail::false"
+          if python -m unittest discover -s tests; then
+            echo "Unit test should not pass"
+            exit 1
           else
-            echo "::set-output name=fail::true"
+            echo "Unit test failed as expected"
           fi
 
-      - name: Mark as failure
-        if: steps.test-results.outputs.fail == 'true'
-        uses: actions/github-script@v4
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const checkRun = await github.checks.create({
-              ...github.context.repo,
-              name: 'Test validation',
-              head_sha: github.context.sha,
-              conclusion: 'failure',
-              status: 'completed',
-              output: {
-                title: 'Unit test validation failed',
-                summary: 'Unit tests fail without code changes',
-              },
-            })
-            core.setOutput('check_run_id', checkRun.data.id)
