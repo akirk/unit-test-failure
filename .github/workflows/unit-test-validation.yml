@@ -55,7 +55,9 @@ jobs:
           fi
 
       - name: Revert code changes (excluding tests)
-        run: git restore --source=$(git merge-base origin/${{ github.event.pull_request.base.ref }} HEAD) --worktree :^tests/
+        run: |
+          git restore .
+          git restore --source=$(git merge-base origin/${{ github.event.pull_request.base.ref }} HEAD) --worktree :^tests/
 
       - name: Run unit tests without changes
         run: |
