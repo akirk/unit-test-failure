@@ -37,7 +37,7 @@ jobs:
           python-version: 3.9
 
       - name: Revert code changes (excluding tests)
-        run: git diff --name-only ${{ github.base_ref }}...${{ github.head_ref }} | grep -v 'tests/' | xargs git checkout ${{ github.base_ref }}
+        run: git diff --name-only -- ${{ github.base_ref }}...${{ github.head_ref }} | grep -v 'tests/' | xargs git checkout ${{ github.base_ref }}
 
       - name: Run unit tests without changes
         run: python -m unittest discover -s tests
