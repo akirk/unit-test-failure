@@ -48,8 +48,11 @@ jobs:
       - name: Check if tests were changed
         run: |
           git restore --source=$(git merge-base origin/${{ github.event.pull_request.base.ref }} HEAD) --worktree tests/
-          git diff --quiet
-          echo "TESTS_CHANGED=$?" >> "${GITHUB_ENV}"
+          if git diff --quiet; then
+            echo "TESTS_CHANGED=0" >> "${GITHUB_ENV}"
+          else:
+            echo "TESTS_CHANGED=1" >> "${GITHUB_ENV}"
+          fi
 
       - name: Revert code changes (excluding tests)
         run: git restore --source=$(git merge-base origin/${{ github.event.pull_request.base.ref }} HEAD) --worktree :^tests/
