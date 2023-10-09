@@ -45,12 +45,18 @@ jobs:
       - name: 'Fetch the other branch with enough history for a common merge-base commit'
         run: git fetch origin ${{ github.event.pull_request.base.ref }}
 
+      - name: Check if tests were changed
+        run: |
+          git restore --source=$(git merge-base origin/${{ github.event.pull_request.base.ref }} HEAD) --worktree tests/
+          git diff --quiet
+          echo "TESTS_CHANGED=$?" >> "${GITHUB_ENV}"
+
       - name: Revert code changes (excluding tests)
         run: git restore --source=$(git merge-base origin/${{ github.event.pull_request.base.ref }} HEAD) --worktree :^tests/
 
       - name: Run unit tests without changes
         run: |
-          if git diff --quiet; then
+          if ${{ env.TESTS_CHANGED }} -eq 0; then
             echo "No unit test changes detected, skipping"
             exit 0
           fi
