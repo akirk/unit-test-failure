@@ -50,7 +50,7 @@ jobs:
           git restore --source=$(git merge-base origin/${{ github.event.pull_request.base.ref }} HEAD) --worktree tests/
           if git diff --quiet; then
             echo "TESTS_CHANGED=0" >> "${GITHUB_ENV}"
-          else:
+          else
             echo "TESTS_CHANGED=1" >> "${GITHUB_ENV}"
           fi
 
