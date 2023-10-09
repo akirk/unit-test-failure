@@ -37,7 +37,7 @@ jobs:
           python-version: 3.9
 
       - name: Revert code changes (excluding tests)
-        run: git restore --source=$(git merge-base ${{ github.event.pull_request.head.ref }} ${{ github.head_ref }}) --worktree :^tests/
+        run: git restore --source=$(git merge-base origin/${{ github.base_ref }} origin/${{ github.head_ref }}) --worktree :^tests/
 
       - name: Run unit tests without changes
         run: |
