@@ -34,14 +34,14 @@ runs:
       id: check-changes
       shell: bash
       run: |
+        set +e
         BASE_SHA=$(git merge-base origin/${{ inputs.base-ref }} HEAD)
         echo "Base SHA: $BASE_SHA"
-        echo "HEAD SHA: $(git rev-parse HEAD)"
+        HEAD_SHA=$(git rev-parse HEAD)
+        echo "HEAD SHA: $HEAD_SHA"
 
-        set +e
         git diff --quiet $BASE_SHA HEAD -- ${{ inputs.test-directory }}
         DIFF_EXIT=$?
-        set -e
 
         if [ $DIFF_EXIT -eq 0 ]; then
           echo "tests-changed=0" >> "${GITHUB_OUTPUT}"
@@ -52,6 +52,7 @@ runs:
           echo "TESTS_CHANGED=1" >> "${GITHUB_ENV}"
           echo "Test changes detected"
         fi
+        set -e
 
     - name: Revert code changes (excluding tests)
       shell: bash
