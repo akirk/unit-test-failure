@@ -42,11 +42,13 @@ runs:
           echo "tests-changed=1" >> "${GITHUB_OUTPUT}"
           echo "TESTS_CHANGED=1" >> "${GITHUB_ENV}"
         fi
-        git restore --source=HEAD --worktree -- . ':!vendor/' ':!node_modules/'
+        git restore --source=HEAD --worktree .
 
     - name: Revert code changes (excluding tests)
       shell: bash
-      run: git restore --source=$(git merge-base origin/${{ inputs.base-ref }} HEAD) --worktree -- . ':!${{ inputs.test-directory }}' ':!vendor/' ':!node_modules/'
+      run: |
+        BASE_SHA=$(git merge-base origin/${{ inputs.base-ref }} HEAD)
+        git ls-tree -r --name-only $BASE_SHA | grep -v '^${{ inputs.test-directory }}' | xargs -r git restore --source=$BASE_SHA --worktree --
       if: env.TESTS_CHANGED == '1'
 
     - name: Run unit tests without changes
