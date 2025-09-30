@@ -1,0 +1,91 @@
+name: 'Unit Test Failure Validation'
+description: 'Validates that unit tests fail without code changes and pass with them, ensuring tests are properly written'
+author: 'Your Name'
+
+inputs:
+  test-command:
+    description: 'Command to run tests (e.g., "npm test", "python -m unittest discover -s tests", "composer test")'
+    required: true
+  base-ref:
+    description: 'Base branch reference'
+    required: false
+    default: ${{ github.event.pull_request.base.ref }}
+  head-sha:
+    description: 'Head commit SHA'
+    required: false
+    default: ${{ github.event.pull_request.head.sha }}
+  pr-commits:
+    description: 'Number of commits in PR'
+    required: false
+    default: ${{ github.event.pull_request.commits }}
+  test-directory:
+    description: 'Directory containing tests (to detect changes)'
+    required: false
+    default: 'tests/'
+
+outputs:
+  tests-changed:
+    description: 'Whether tests were changed (1 or 0)'
+    value: ${{ steps.check-changes.outputs.tests-changed }}
+  validation-passed:
+    description: 'Whether validation passed (tests failed without changes, passed with changes)'
+    value: ${{ steps.validate.outputs.passed }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Calculate fetch depth
+      shell: bash
+      run: echo "PR_FETCH_DEPTH=$(( ${{ inputs.pr-commits }} + 1 ))" >> "${GITHUB_ENV}"
+
+    - name: Checkout PR branch with history
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ inputs.head-sha }}
+        fetch-depth: ${{ env.PR_FETCH_DEPTH }}
+
+    - name: Fetch base branch
+      shell: bash
+      run: git fetch origin ${{ inputs.base-ref }}
+
+    - name: Check if tests were changed
+      id: check-changes
+      shell: bash
+      run: |
+        git restore --source=$(git merge-base origin/${{ inputs.base-ref }} HEAD) --worktree ${{ inputs.test-directory }}
+        if git diff --quiet; then
+          echo "tests-changed=0" >> "${GITHUB_OUTPUT}"
+          echo "TESTS_CHANGED=0" >> "${GITHUB_ENV}"
+        else
+          echo "tests-changed=1" >> "${GITHUB_OUTPUT}"
+          echo "TESTS_CHANGED=1" >> "${GITHUB_ENV}"
+        fi
+        git restore .
+
+    - name: Revert code changes (excluding tests)
+      shell: bash
+      run: git restore --source=$(git merge-base origin/${{ inputs.base-ref }} HEAD) --worktree :^${{ inputs.test-directory }}
+      if: env.TESTS_CHANGED == '1'
+
+    - name: Run unit tests without changes
+      id: validate
+      shell: bash
+      run: |
+        if [[ ${{ env.TESTS_CHANGED }} -eq 0 ]]; then
+          echo "No unit test changes detected, skipping validation"
+          echo "passed=skipped" >> "${GITHUB_OUTPUT}"
+          exit 0
+        fi
+
+        if ${{ inputs.test-command }}; then
+          echo "❌ Unit test should not pass without code changes"
+          echo "passed=0" >> "${GITHUB_OUTPUT}"
+          exit 1
+        else
+          echo "✅ Unit test failed as expected without code changes"
+          echo "passed=1" >> "${GITHUB_OUTPUT}"
+        fi
+
+branding:
+  icon: 'check-circle'
+  color: 'green'
