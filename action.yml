@@ -58,7 +58,22 @@ runs:
       shell: bash
       run: |
         BASE_SHA=$(git merge-base origin/${{ inputs.base-ref }} HEAD)
-        git diff --name-only $BASE_SHA HEAD | grep -v '^${{ inputs.test-directory }}' | xargs -r git restore --source=$BASE_SHA --worktree --
+
+        # Store the BASE_SHA for later restoration
+        echo "BASE_SHA=$BASE_SHA" >> "${GITHUB_ENV}"
+
+        # Get all changed files except those in test directory
+        TEST_DIR="${{ inputs.test-directory }}"
+        # Remove trailing slash for consistent comparison
+        TEST_DIR="${TEST_DIR%/}"
+
+        git diff --name-only $BASE_SHA HEAD | while IFS= read -r file; do
+          # Skip files that start with the test directory path
+          if [[ "$file" != "$TEST_DIR"* ]]; then
+            echo "Reverting: $file"
+            git restore --source=$BASE_SHA --worktree -- "$file"
+          fi
+        done
       if: env.TESTS_CHANGED == '1'
 
     - name: Run unit tests without changes
@@ -71,7 +86,12 @@ runs:
           exit 0
         fi
 
-        if ${{ inputs.test-command }}; then
+        set +e
+        ${{ inputs.test-command }}
+        TEST_EXIT=$?
+        set -e
+
+        if [ $TEST_EXIT -eq 0 ]; then
           echo "❌ Unit test should not pass without code changes"
           echo "passed=0" >> "${GITHUB_OUTPUT}"
           exit 1
@@ -79,6 +99,15 @@ runs:
           echo "✅ Unit test failed as expected without code changes"
           echo "passed=1" >> "${GITHUB_OUTPUT}"
         fi
+
+    - name: Restore code changes
+      shell: bash
+      run: |
+        if [[ ${{ env.TESTS_CHANGED }} -eq 1 ]]; then
+          echo "Restoring original code changes..."
+          git restore --source=HEAD --worktree -- .
+        fi
+      if: always()
 
 branding:
   icon: "check-circle"
