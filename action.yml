@@ -26,16 +26,34 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Determine base reference
+      id: determine-base
+      shell: bash
+      run: |
+        BASE_REF="${{ inputs.base-ref }}"
+
+        # If base-ref is empty, try to get it from PR context or use 'main'
+        if [ -z "$BASE_REF" ]; then
+          if [ -n "${{ github.event.pull_request.base.ref }}" ]; then
+            BASE_REF="${{ github.event.pull_request.base.ref }}"
+          else
+            BASE_REF="main"
+          fi
+        fi
+
+        echo "Using base reference: $BASE_REF"
+        echo "BASE_REF=$BASE_REF" >> "${GITHUB_ENV}"
+
     - name: Fetch base branch
       shell: bash
-      run: git fetch origin ${{ inputs.base-ref }}
+      run: git fetch origin ${{ env.BASE_REF }}
 
     - name: Check if tests were changed
       id: check-changes
       shell: bash
       run: |
         set +e
-        BASE_SHA=$(git merge-base origin/${{ inputs.base-ref }} HEAD)
+        BASE_SHA=$(git merge-base origin/${{ env.BASE_REF }} HEAD)
         echo "Base SHA: $BASE_SHA"
         HEAD_SHA=$(git rev-parse HEAD)
         echo "HEAD SHA: $HEAD_SHA"
@@ -57,7 +75,7 @@ runs:
     - name: Revert code changes (excluding tests)
       shell: bash
       run: |
-        BASE_SHA=$(git merge-base origin/${{ inputs.base-ref }} HEAD)
+        BASE_SHA=$(git merge-base origin/${{ env.BASE_REF }} HEAD)
 
         # Store the BASE_SHA for later restoration
         echo "BASE_SHA=$BASE_SHA" >> "${GITHUB_ENV}"
