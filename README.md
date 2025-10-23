@@ -41,6 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Required to find merge-base
 
       - name: Install dependencies
         run: # your dependency installation here
@@ -54,6 +56,8 @@ jobs:
         run: composer test
 ```
 
+**Note:** `fetch-depth: 0` is required so the action can find the merge-base between your PR and the base branch.
+
 The validation step should run **before** your actual test suite to ensure new tests properly fail without the implementation changes.
 
 ### Skipping Validation for Test Coverage PRs
@@ -61,6 +65,10 @@ The validation step should run **before** your actual test suite to ensure new t
 When adding tests to existing working code (not bug fixes), the tests should pass even with the old code. In these cases, you can skip validation using a PR label:
 
 ```yaml
+- uses: actions/checkout@v3
+  with:
+    fetch-depth: 0
+
 - name: Validate tests fail without code changes
   uses: akirk/unit-test-failure@main
   with:
