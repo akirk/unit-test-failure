@@ -6,16 +6,18 @@ A GitHub Action that validates unit tests are properly written by ensuring they 
 
 ## Why?
 
-When fixing bugs or adding new features with tests, it's critical to verify that the new tests actually expose the problem they claim to solve. A test that passes with both the old (buggy) and new (fixed) code validates nothing.
+When you fix a bug and then add a test for it, there's a hidden risk: **the test might pass even with the buggy code**, providing false confidence. You think you've protected against regression, but the test doesn't actually catch the bug.
 
 **The principle**: Keep the new unit test, undo the other code changes. The unit test now needs to fail.
+
+In Test-Driven Development (TDD), this happens naturally - you write the failing test first, see it fail ("red"), then implement the fix to make it pass ("green"). But most developers don't practice strict TDD. And even when you do TDD, once you start refining the test or realize it doesn't cover all edge cases, you lose the proof that it ever failed. This action automates that validation step, giving you the same safety without changing your workflow - and verifying it even when tests are modified after the initial "red" phase.
 
 This action helps prevent inadequate test coverage by:
 
 - Ensuring new tests for bug fixes actually expose the original bug
 - Validating that tests aren't just checking trivial assertions
 - Catching tests that pass due to mocking/stubbing issues
-- Supporting Test-Driven Development (TDD) workflows
+- Automating TDD's "red" phase validation - no TDD workflow required
 
 ## How It Works
 
@@ -39,6 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Required to find merge-base
 
       - name: Install dependencies
         run: # your dependency installation here
@@ -52,6 +56,8 @@ jobs:
         run: composer test
 ```
 
+**Note:** `fetch-depth: 0` is required so the action can find the merge-base between your PR and the base branch.
+
 The validation step should run **before** your actual test suite to ensure new tests properly fail without the implementation changes.
 
 ### Skipping Validation for Test Coverage PRs
@@ -59,6 +65,10 @@ The validation step should run **before** your actual test suite to ensure new t
 When adding tests to existing working code (not bug fixes), the tests should pass even with the old code. In these cases, you can skip validation using a PR label:
 
 ```yaml
+- uses: actions/checkout@v3
+  with:
+    fetch-depth: 0
+
 - name: Validate tests fail without code changes
   uses: akirk/unit-test-failure@main
   with:
