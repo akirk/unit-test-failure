@@ -1,0 +1,132 @@
+name: "Unit Test Failure Validation"
+description: "Validates that unit tests fail without code changes and pass with them, ensuring tests are properly written"
+author: "Alex Kirk"
+
+inputs:
+  test-command:
+    description: 'Command to run tests (e.g., "npm test", "python -m unittest discover -s tests", "composer test")'
+    required: true
+  base-ref:
+    description: "Base branch reference"
+    required: false
+    default: ${{ github.event.pull_request.base.ref }}
+  test-directory:
+    description: "Directory containing tests (to detect changes)"
+    required: false
+    default: "tests/"
+
+outputs:
+  tests-changed:
+    description: "Whether tests were changed (1 or 0)"
+    value: ${{ steps.check-changes.outputs.tests-changed }}
+  validation-passed:
+    description: "Whether validation passed (tests failed without changes, passed with changes)"
+    value: ${{ steps.validate.outputs.passed }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Determine base reference
+      id: determine-base
+      shell: bash
+      run: |
+        BASE_REF="${{ inputs.base-ref }}"
+
+        # If base-ref is empty, try to get it from PR context or use 'main'
+        if [ -z "$BASE_REF" ]; then
+          if [ -n "${{ github.event.pull_request.base.ref }}" ]; then
+            BASE_REF="${{ github.event.pull_request.base.ref }}"
+          else
+            BASE_REF="main"
+          fi
+        fi
+
+        echo "Using base reference: $BASE_REF"
+        echo "BASE_REF=$BASE_REF" >> "${GITHUB_ENV}"
+
+    - name: Fetch base branch
+      shell: bash
+      run: git fetch origin ${{ env.BASE_REF }}
+
+    - name: Check if tests were changed
+      id: check-changes
+      shell: bash
+      run: |
+        set +e
+        BASE_SHA=$(git merge-base origin/${{ env.BASE_REF }} HEAD)
+        echo "Base SHA: $BASE_SHA"
+        HEAD_SHA=$(git rev-parse HEAD)
+        echo "HEAD SHA: $HEAD_SHA"
+
+        git diff --quiet $BASE_SHA HEAD -- ${{ inputs.test-directory }}
+        DIFF_EXIT=$?
+
+        if [ $DIFF_EXIT -eq 0 ]; then
+          echo "tests-changed=0" >> "${GITHUB_OUTPUT}"
+          echo "TESTS_CHANGED=0" >> "${GITHUB_ENV}"
+          echo "No test changes detected"
+        else
+          echo "tests-changed=1" >> "${GITHUB_OUTPUT}"
+          echo "TESTS_CHANGED=1" >> "${GITHUB_ENV}"
+          echo "Test changes detected"
+        fi
+        set -e
+
+    - name: Revert code changes (excluding tests)
+      shell: bash
+      run: |
+        BASE_SHA=$(git merge-base origin/${{ env.BASE_REF }} HEAD)
+
+        # Store the BASE_SHA for later restoration
+        echo "BASE_SHA=$BASE_SHA" >> "${GITHUB_ENV}"
+
+        # Get all changed files except those in test directory
+        TEST_DIR="${{ inputs.test-directory }}"
+        # Remove trailing slash for consistent comparison
+        TEST_DIR="${TEST_DIR%/}"
+
+        git diff --name-only $BASE_SHA HEAD | while IFS= read -r file; do
+          # Skip files that start with the test directory path
+          if [[ "$file" != "$TEST_DIR"* ]]; then
+            echo "Reverting: $file"
+            git restore --source=$BASE_SHA --worktree -- "$file"
+          fi
+        done
+      if: env.TESTS_CHANGED == '1'
+
+    - name: Run unit tests without changes
+      id: validate
+      shell: bash
+      run: |
+        if [[ ${{ env.TESTS_CHANGED }} -eq 0 ]]; then
+          echo "No unit test changes detected, skipping validation"
+          echo "passed=skipped" >> "${GITHUB_OUTPUT}"
+          exit 0
+        fi
+
+        set +e
+        ${{ inputs.test-command }}
+        TEST_EXIT=$?
+        set -e
+
+        if [ $TEST_EXIT -eq 0 ]; then
+          echo "❌ Unit test should not pass without code changes"
+          echo "passed=0" >> "${GITHUB_OUTPUT}"
+          exit 1
+        else
+          echo "✅ Unit test failed as expected without code changes"
+          echo "passed=1" >> "${GITHUB_OUTPUT}"
+        fi
+
+    - name: Restore code changes
+      shell: bash
+      run: |
+        if [[ ${{ env.TESTS_CHANGED }} -eq 1 ]]; then
+          echo "Restoring original code changes..."
+          git restore --source=HEAD --worktree -- .
+        fi
+      if: always()
+
+branding:
+  icon: "check-circle"
+  color: "green"

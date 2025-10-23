@@ -28,48 +28,17 @@ jobs:
     if: ${{ github.event_name == 'pull_request' }}
 
     steps:
-      - name: PR commits + 1
-        run: echo "PR_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
-
-      - name: Checkout PR branch and all PR commits
+      - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: ${{ env.PR_FETCH_DEPTH }}
 
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
           python-version: 3.9
 
-      - name: 'Fetch the other branch with enough history for a common merge-base commit'
-        run: git fetch origin ${{ github.event.pull_request.base.ref }}
-
-      - name: Check if tests were changed
-        run: |
-          git restore --source=$(git merge-base origin/${{ github.event.pull_request.base.ref }} HEAD) --worktree tests/
-          if git diff --quiet; then
-            echo "TESTS_CHANGED=0" >> "${GITHUB_ENV}"
-          else
-            echo "TESTS_CHANGED=1" >> "${GITHUB_ENV}"
-          fi
-          git restore .
-
-      - name: Revert code changes (excluding tests)
-        run: git restore --source=$(git merge-base origin/${{ github.event.pull_request.base.ref }} HEAD) --worktree :^tests/
-        if: ${{ env.TESTS_CHANGED }} == '1'
-
-      - name: Run unit tests without changes
-        run: |
-          if [[ ${{ env.TESTS_CHANGED }} -eq 0 ]]; then
-            echo "No unit test changes detected, skipping"
-            exit 0
-          fi
-
-          if python -m unittest discover -s tests; then
-            echo "Unit test should not pass"
-            exit 1
-          else
-            echo "Unit test failed as expected"
-          fi
+      - name: Validate unit tests fail without code changes
+        uses: ./.
+        with:
+          test-command: 'python -m unittest discover -s tests'
+          test-directory: 'tests/'
 
