@@ -54,6 +54,20 @@ jobs:
 
 The validation step should run **before** your actual test suite to ensure new tests properly fail without the implementation changes.
 
+### Skipping Validation for Test Coverage PRs
+
+When adding tests to existing working code (not bug fixes), the tests should pass even with the old code. In these cases, you can skip validation using a PR label:
+
+```yaml
+- name: Validate tests fail without code changes
+  uses: akirk/unit-test-failure@main
+  with:
+    test-command: composer test
+  if: ${{ !contains(github.event.pull_request.labels.*.name, 'test-coverage') }}
+```
+
+Now when you add the `test-coverage` label to a PR, the validation will be skipped.
+
 ### Examples
 
 #### Python (unittest)
